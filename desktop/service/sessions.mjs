@@ -6,9 +6,9 @@ import os from 'node:os';
 import pty from 'node-pty';
 import headless from '@xterm/headless';
 import serialize from '@xterm/addon-serialize';
-import { terminalCommand, childEnvironment } from './agents.mjs';
+import { terminalCommand, childEnvironment, createOpenCodeSession, opencodeBinary } from './agents.mjs';
 import { readJson, saveJson } from './util.mjs';
-import { claudeTranscript, codexTranscript, tailNativeFile } from './native-events.mjs';
+import { claudeTranscript, codexTranscript, tailNativeFile, opencodeBoundary, tailOpenCodeSession } from './native-events.mjs';
 import { englishTitle, restoredTitle } from './titles.mjs';
 import { defaultWorkerEffort, workerEfforts } from './effort.mjs';
 
@@ -34,7 +34,7 @@ export class Sessions extends EventEmitter {
     await mkdir(this.stateDir, { recursive: true });
     const saved = await readJson(path.join(this.stateDir, 'sessions.json'), []);
     for (const [index, metadata] of saved.entries()) {
-      const item = this.make({ ...metadata, name: restoredTitle(metadata.name, index), open: metadata.open ?? metadata.agent !== 'kimi', pinned: !!metadata.pinned, updatedAt: metadata.updatedAt || metadata.lastInputAt || metadata.createdAt, hasConversation: metadata.hasConversation ?? (metadata.agent === 'codex' && !!metadata.nativeId), status: 'stopped', activity: 'idle', attention: !!metadata.unread });
+      const item = this.make({ ...metadata, name: restoredTitle(metadata.name, index), open: metadata.open ?? metadata.agent !== 'kimi', pinned: !!metadata.pinned, updatedAt: metadata.updatedAt || metadata.lastInputAt || metadata.createdAt, hasConversation: metadata.hasConversation ?? ((metadata.agent === 'codex' || metadata.agent === 'opencode') && !!metadata.nativeId), status: 'stopped', activity: 'idle', attention: !!metadata.unread });
       this.items.set(item.id, item);
       if (item.open) await this.hydrate(item);
     }
@@ -90,12 +90,15 @@ export class Sessions extends EventEmitter {
     const cwd = path.resolve(options.cwd || this.repo);
     if (!(await stat(cwd)).isDirectory()) throw new Error('Working folder must be a directory');
     const now = new Date().toISOString();
+    const name = englishTitle(options.name, `Conversation ${this.items.size + 1}`);
+    let nativeId = options.resumeId || null;
+    if (agent === 'opencode' && !nativeId) nativeId = await createOpenCodeSession(cwd, name);
     const session = this.make({
-      id: randomUUID(), agent, name: englishTitle(options.name, `Conversation ${this.items.size + 1}`),
+      id: randomUUID(), agent, name,
       tabOrder: Math.max(-1, ...this.list().map(item => item.tabOrder)) + 1,
       cwd, bypass: options.bypass === true, createdAt: now, lastInputAt: null, lastOutputAt: null,
       effort: options.effort,
-      status: 'starting', nativeId: options.resumeId || (agent === 'claude' ? randomUUID() : null),
+      status: 'starting', nativeId: nativeId || (agent === 'claude' ? randomUUID() : null),
       open: true, pinned: false, updatedAt: now, preview: '', hasConversation: !!options.resumeId, restoreError: null,
       attention: false, cols: Math.min(500, Math.max(20, options.cols || 90)), rows: Math.min(200, Math.max(5, options.rows || 32)),
     });
@@ -108,7 +111,7 @@ export class Sessions extends EventEmitter {
   }
 
   async importConversation({ agent, nativeId, name, cwd, pinned = false, bypass = false }) {
-    if (!['codex', 'claude', 'kimi'].includes(agent) || typeof nativeId !== 'string' || !nativeId.trim()) throw new Error('Choose an agent and its native conversation ID.');
+    if (!['codex', 'claude', 'kimi', 'opencode'].includes(agent) || typeof nativeId !== 'string' || !nativeId.trim()) throw new Error('Choose an agent and its native conversation ID.');
     nativeId = nativeId.trim();
     cwd = path.resolve(cwd || this.repo);
     if (!(await stat(cwd)).isDirectory()) throw new Error('Working folder must be a directory');
@@ -124,6 +127,7 @@ export class Sessions extends EventEmitter {
     const command = terminalCommand(session.agent, { bypass: session.bypass, resumeId, nativeId: session.nativeId, effort: session.effort });
     const env = childEnvironment(this.repo);
     if (session.agent === 'codex') env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE = `mrmak_chat_${session.id}`;
+    if (session.agent === 'opencode') env.OPENCODE_CLIENT = `mrmak_chat_${session.id}`;
     const proc = pty.spawn(command.file, command.args, { name: 'xterm-256color', cwd: session.cwd, env, cols: session.cols, rows: session.rows, useConpty: true, useConptyDll: true });
     session.process = proc;
     session.deviceReplies?.dispose();
@@ -168,10 +172,12 @@ export class Sessions extends EventEmitter {
     this.changed(session);
     // Discovery is read-only, and only accepts an unambiguous native session.
     this.beginDiscovery(session);
-    if (nativeWatch) this.watchNative(session, nativeWatch.file, nativeWatch.offset);
+    if (nativeWatch?.opencode) this.watchOpenCode(session, nativeWatch);
+    else if (nativeWatch) this.watchNative(session, nativeWatch.file, nativeWatch.offset);
     else if (session.agent === 'claude' && session.nativeId) claudeTranscript(session.cwd, session.nativeId).then(file => {
       if (session.process === proc) this.watchNative(session, file);
     }).catch(() => {});
+    else if (session.agent === 'opencode' && session.nativeId) this.watchOpenCode(session, { sessionId: session.nativeId });
   }
 
   beginDiscovery(session) {
@@ -184,6 +190,12 @@ export class Sessions extends EventEmitter {
     if (!session.process) return;
     session.stopNativeWatch?.();
     session.stopNativeWatch = tailNativeFile(file, session.agent, event => this.nativeEvent(session, event), offset);
+  }
+
+  watchOpenCode(session, boundary) {
+    if (!session.process || !boundary?.sessionId) return;
+    session.stopNativeWatch?.();
+    session.stopNativeWatch = tailOpenCodeSession(opencodeBinary(), boundary.sessionId, event => this.nativeEvent(session, event), boundary);
   }
 
   nativeEvent(session, event) {
@@ -360,6 +372,10 @@ export class Sessions extends EventEmitter {
     session.unread = false; session.attention = false; this.changed(session);
   }
   async nativeBoundary(session, resumeId) {
+    if (resumeId && session.agent === 'opencode') {
+      const boundary = await opencodeBoundary(opencodeBinary(), resumeId).catch(() => null);
+      return boundary ? { opencode: true, ...boundary } : null;
+    }
     const file = !resumeId ? null : session.agent === 'codex' ? await codexTranscript(resumeId) : session.agent === 'claude' ? await claudeTranscript(session.cwd, resumeId) : null;
     return file ? { file, offset: (await stat(file).catch(() => null))?.size || 0 } : null;
   }

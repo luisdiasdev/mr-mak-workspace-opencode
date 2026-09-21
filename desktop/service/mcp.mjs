@@ -51,6 +51,15 @@ export class McpInventory {
         if (config && typeof config === 'object') entries.push({ client, scope, file, name, config, priority, ...extras });
       }
     };
+    const normalizeOpenCode = config => {
+      if (!config || typeof config !== 'object' || Array.isArray(config)) return config;
+      const copy = { ...config };
+      if (Array.isArray(copy.command)) {
+        copy.args = copy.command.slice(1);
+        copy.command = copy.command[0];
+      }
+      return copy;
+    };
     const paths = {
       codexUser: path.join(codexHome, 'config.toml'), codexProject: path.join(this.repo, '.codex/config.toml'),
       claudeUser: this.env.CLAUDE_CONFIG_DIR ? path.join(claudeHome, '.claude.json') : path.join(this.home, '.claude.json'),
@@ -58,6 +67,8 @@ export class McpInventory {
       claudeProjectSettings: path.join(this.repo, '.claude/settings.json'), claudeLocalSettings: path.join(this.repo, '.claude/settings.local.json'),
       kimiUser: path.join(this.home, '.kimi/mcp.json'), kimiProject: path.join(this.repo, '.kimi-code/mcp.json'),
       cursorUser: path.join(this.home, '.cursor/mcp.json'), cursorProject: path.join(this.repo, '.cursor/mcp.json'),
+      opencodeUser: path.join(this.home, '.config', 'opencode', 'opencode.json'),
+      opencodeProject: path.join(this.repo, '.opencode', 'opencode.json'),
     };
     const values = Object.fromEntries(await Promise.all(Object.entries(paths).map(async ([name, file]) => [name, await read(file)])));
     const codex = merge(values.codexUser, values.codexProject);
@@ -65,6 +76,10 @@ export class McpInventory {
     add('codex', 'project', paths.codexProject, values.codexProject.mcp_servers, 20);
     add('claude', 'global', paths.claudeUser, values.claudeUser.mcpServers, 10);
     add('claude', 'project', paths.claudeProject, values.claudeProject.mcpServers, 20);
+    const openCodeUserMcp = object(values.opencodeUser.mcp);
+    const openCodeProjectMcp = object(values.opencodeProject.mcp);
+    add('opencode', 'global', paths.opencodeUser, Object.fromEntries(Object.entries(openCodeUserMcp).map(([name, cfg]) => [name, normalizeOpenCode(cfg)])), 10);
+    add('opencode', 'project', paths.opencodeProject, Object.fromEntries(Object.entries(openCodeProjectMcp).map(([name, cfg]) => [name, normalizeOpenCode(cfg)])), 20);
     const localProject = Object.entries(object(values.claudeUser.projects)).find(([folder]) => key(folder) === key(this.repo))?.[1] || {};
     add('claude', 'local', paths.claudeUser, localProject.mcpServers, 30);
     const claudeSettings = merge(merge(values.claudeSettings, values.claudeProjectSettings), values.claudeLocalSettings);

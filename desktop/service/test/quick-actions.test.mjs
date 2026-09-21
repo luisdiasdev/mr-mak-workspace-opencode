@@ -67,10 +67,15 @@ test('reasoning is medium or above, research uses xhigh, and max needs an explic
   assert.equal(requestDate('Что делали вчера?', new Date(2026, 8, 12)), '2026-09-11');
   assert.equal(requestDate('10 сентября 2026'), '2026-09-10');
   assert.equal(requestDate('10.09.2026'), '2026-09-10');
-  for (const agent of ['codex', 'claude']) {
+  for (const agent of ['codex', 'claude', 'opencode']) {
     if (!inventory().find(item => item.id === agent)?.available) continue;
     const command = terminalCommand(agent, { effort: 'xhigh', bypass: false });
     const script = process.platform === 'win32' ? Buffer.from(command.args.at(-1), 'base64').toString('utf16le') : command.args.join(' ');
-    assert.match(script, agent === 'codex' ? /model_reasoning_effort="xhigh"/ : /--effort[' ]+xhigh/);
+    if (agent === 'codex') assert.match(script, /model_reasoning_effort="xhigh"/);
+    else if (agent === 'claude') assert.match(script, /--effort[' ]+xhigh/);
+    else {
+      assert.doesNotMatch(script, /mini/);
+      assert.doesNotMatch(script, /--variant|model_reasoning_effort|--effort/);
+    }
   }
 });

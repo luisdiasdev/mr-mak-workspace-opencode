@@ -10,7 +10,7 @@ const execute = promisify(execFile);
 export class ContextLibrary {
   constructor(repo) {
     this.repo = repo;
-    this.skillRoots = [path.join(repo, '.agents', 'skills'), path.join(repo, '.claude', 'skills'), path.join(os.homedir(), '.agents', 'skills'), path.join(os.homedir(), '.codex', 'skills'), path.join(os.homedir(), '.codex', 'plugins', 'cache')];
+    this.skillRoots = [path.join(repo, '.opencode', 'skills'), path.join(repo, '.agents', 'skills'), path.join(repo, '.claude', 'skills'), path.join(os.homedir(), '.config', 'opencode', 'skills'), path.join(os.homedir(), '.opencode', 'skills'), path.join(os.homedir(), '.agents', 'skills'), path.join(os.homedir(), '.codex', 'skills'), path.join(os.homedir(), '.codex', 'plugins', 'cache')];
   }
   async orientation() {
     const names = ['AGENTS.md', 'context/me.md', 'context/identity.md', 'context/goals.md', 'context/preferences.md', 'desktop/coordinator.md'];

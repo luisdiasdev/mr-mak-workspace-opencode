@@ -6,6 +6,7 @@ export function AgentLogo({ agent, size = 18 }: { agent: AgentId; size?: number 
   if (agent === 'claude') return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="agent-logo">{Array.from({ length: 12 }, (_, index) => <path key={index} d={`M12 ${index % 2 ? 3 : 1.8}V9`} transform={`rotate(${index * 30} 12 12)`} />)}</svg>
   if (agent === 'codex') return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinejoin="round" aria-hidden="true" className="agent-logo">{Array.from({ length: 6 }, (_, index) => <path key={index} d="M12 3.5c-3.7-2-7.7 1-6.5 5L12 12l5.5-3.2V5.9L12 3.5Z" transform={`rotate(${index * 60} 12 12)`} />)}</svg>
   if (agent === 'kimi') return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" aria-hidden="true" className="agent-logo"><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" fillOpacity=".12" strokeWidth="1" /><path d="M8 6v12M16 6l-7 6 7 6" /></svg>
+  if (agent === 'opencode') return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="agent-logo"><path d="M12 2l8.66 5v10L12 22l-8.66-5V7L12 2z" strokeLinejoin="round" /><path d="M10 9l-3 3 3 3M14 9l3 3-3 3" strokeLinecap="round" strokeLinejoin="round" /></svg>
   return <Icon name="terminal" size={size} />
 }
 

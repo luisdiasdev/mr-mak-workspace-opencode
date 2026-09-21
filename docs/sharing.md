@@ -17,7 +17,8 @@ To share selected skills, copy their canonical folders from `.agents/skills`
 with every referenced resource. Repository workflows may also depend on
 `knowledge/`, `processes/` or `scripts/`; read `docs/skills.md` before copying a
 single folder. The complete `.claude/skills` copies can be shared with Claude
-users as well. Run `npm run skills:sync` after changing the maintained source.
+users, and `.opencode/skills` can be shared with OpenCode users. Run
+`npm run skills:sync` after changing the maintained source.
 
 An agent preparing a release should run lint, service tests, template checks
 and the desktop build. Check the four starter cards in a fresh browser session,

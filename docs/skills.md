@@ -2,8 +2,9 @@
 
 Fourteen skills live in this project. `.agents/skills` is the maintained source
 for Codex; `.claude/skills` contains complete, identical copies for Claude Code,
-including scripts and references. Both Skills sections open the full instructions.
-These are local project files, not global installations.
+including scripts and references. OpenCode also reads `.agents/skills`,
+`.claude/skills` and `.opencode/skills`. All Skills sections open the full
+instructions. These are local project files, not global installations.
 
 Claude reads the instructions in its own `SKILL.md` when a skill is used; a
 Markdown link is just a request to read another file, not automatic inheritance.

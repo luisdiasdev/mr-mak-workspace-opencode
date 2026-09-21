@@ -2,8 +2,14 @@ import { open, stat, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { StringDecoder } from 'node:string_decoder';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 export function completedTurn(record, agent) {
+  if (agent === 'opencode' && record.kind === 'turn-completed') return record;
+  if (agent === 'opencode' && record.kind === 'attention') return record;
   if (agent === 'codex' && record.type === 'event_msg' && record.payload?.type === 'task_complete') return { kind: 'turn-completed', id: record.payload.turn_id, text: 'The agent finished its turn. Review the result.', preview: String(record.payload.last_agent_message || '').slice(-350) };
   // Claude writes thinking and text as separate records with the same message ID
   // and stop reason. Only the actual final answer creates a completion notice.
@@ -93,4 +99,86 @@ export async function codexTranscript(nativeId) {
     }
   }
   return matches.length === 1 ? matches[0] : null;
+}
+
+function textPreview(content) {
+  if (!Array.isArray(content)) return '';
+  return content.filter(item => item.type === 'text').map(item => item.text).join('\n').slice(-350);
+}
+
+export async function opencodeBoundary(binary, sessionId) {
+  const { stdout } = await execFileAsync(binary, ['api', 'GET', `/api/session/${sessionId}/message?limit=1`], { encoding: 'utf8', timeout: 10000 });
+  const data = JSON.parse(stdout);
+  const msg = data.data?.[0];
+  return { sessionId, lastMessageId: msg?.id || null, lastType: msg?.type || null, lastCompleted: !!msg?.time?.completed };
+}
+
+export function tailOpenCodeSession(binary, sessionId, onEvent, boundary = null, options = {}) {
+  const { cwd = process.cwd(), binaryArgs = [], interval = 600 } = options;
+  let lastId = boundary?.lastMessageId || null;
+  let lastType = boundary?.lastType || null;
+  let lastCompleted = boundary ? !!boundary.lastCompleted : true;
+  let working = false;
+  let closed = false;
+  let failures = 0;
+
+  const tick = async () => {
+    if (closed) return;
+    try {
+      const { stdout } = await execFileAsync(binary, [...binaryArgs, 'api', 'GET', `/api/session/${sessionId}/message?limit=1`], { cwd, encoding: 'utf8', timeout: 10000 });
+      failures = 0;
+      const data = JSON.parse(stdout);
+      const msg = data.data?.[0];
+      if (!msg) return;
+      const type = msg.type;
+      const completed = !!msg.time?.completed;
+
+      if (lastId === null) {
+        lastId = msg.id; lastType = type; lastCompleted = completed;
+        if (boundary === null && type === 'assistant' && !completed) {
+          working = true;
+          onEvent({ kind: 'turn-started' });
+        }
+        return;
+      }
+
+      if (msg.id === lastId) {
+        if (!lastCompleted && completed) {
+          lastCompleted = true;
+          if (working) {
+            working = false;
+            onEvent({ kind: 'turn-completed', id: msg.id, text: 'The agent finished its turn. Review the result.', preview: textPreview(msg.content) });
+          }
+        }
+        return;
+      }
+
+      // A new latest message appeared.
+      if (working && lastType === 'assistant' && !lastCompleted) {
+        if (type === 'user') onEvent({ kind: 'turn-interrupted' });
+        else onEvent({ kind: 'turn-interrupted' }); // incomplete turn replaced; clear working state
+        working = false;
+      }
+
+      lastId = msg.id; lastType = type; lastCompleted = completed;
+
+      if (type === 'assistant') {
+        if (!completed) {
+          if (!working) {
+            working = true;
+            onEvent({ kind: 'turn-started' });
+          }
+        } else {
+          if (working) working = false;
+          onEvent({ kind: 'turn-completed', id: msg.id, text: 'The agent finished its turn. Review the result.', preview: textPreview(msg.content) });
+        }
+      }
+    } catch {
+      failures++;
+      if (failures > 15) { closed = true; clearInterval(timer); }
+    }
+  };
+
+  const timer = setInterval(tick, interval); timer.unref(); tick();
+  return () => { closed = true; clearInterval(timer); };
 }

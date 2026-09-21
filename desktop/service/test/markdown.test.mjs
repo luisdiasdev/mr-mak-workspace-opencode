@@ -27,9 +27,9 @@ test('Markdown saves preserve Unicode, keep a recovery copy, and reject stale or
 
 test('Main folders expose local Claude and Codex skills alongside knowledge and processes', async () => {
   const repo = await mkdtemp(path.resolve('.cache/skill-folders-'));
-  for (const folder of ['.claude/skills', '.agents/skills', 'knowledge', 'processes', 'context', 'inbox', 'projects', 'workspace', 'node_modules']) await mkdir(path.join(repo, folder), { recursive: true });
+  for (const folder of ['.claude/skills', '.agents/skills', '.opencode/skills', 'knowledge', 'processes', 'context', 'inbox', 'projects', 'workspace', 'node_modules']) await mkdir(path.join(repo, folder), { recursive: true });
   const result = await new Files(repo).list();
-  assert.deepEqual(result.entries.map(item => item.name).sort(), ['Claude skills', 'Codex skills', 'context', 'inbox', 'knowledge', 'processes', 'projects', 'workspace']);
+  assert.deepEqual(result.entries.map(item => item.name).sort(), ['Claude skills', 'Codex skills', 'OpenCode skills', 'context', 'inbox', 'knowledge', 'processes', 'projects', 'workspace']);
   assert.ok(result.entries.every(entry => entry.directory && path.isAbsolute(entry.path)));
 });
 

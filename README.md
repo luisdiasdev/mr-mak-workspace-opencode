@@ -6,16 +6,17 @@ Mr. Mak gives you two connected windows: real CLI chats on the left, and a
 Workspace for projects, research, images and files. Keep both open, or minimize
 the Workspace while an agent helps you in Blender, a game engine or your browser.
 
-**Prerequisite: install and sign in to Codex CLI and/or Claude Code CLI before
-setting up Mr. Mak.** You need at least one of these CLIs to install and use this
-agent-first Workspace. Both can be used side by side. They are separate
-installations and are not bundled with Mr. Mak.
+**Prerequisite: install and sign in to Codex CLI, Claude Code CLI and/or
+OpenCode v2 CLI before setting up Mr. Mak.** You need at least one of these CLIs
+to install and use this agent-first Workspace. They can be used side by side.
+They are separate installations and are not bundled with Mr. Mak.
 
 - [Install Codex CLI](https://developers.openai.com/codex/cli)
 - [Install Claude Code CLI](https://code.claude.com/docs/en/setup)
+- [Install OpenCode CLI](https://opencode.ai)
 
 The optional voice coordinator specifically requires **Codex CLI**, even when
-Claude Code handles your main tasks. Voice also needs your own OpenAI API key.
+Claude Code or OpenCode handles your main tasks. Voice also needs your own OpenAI API key.
 
 ![Mr. Mak Workspace home with project cards and the Files tree open](docs/assets/workspace-overview.png)
 
@@ -63,7 +64,7 @@ your own agent accounts and any services you want to use.
 3. Use **+** in Chats to open an installed CLI. Sign in with your own account.
 
 The installer includes the local Node service. It does not include Codex,
-Claude Code, Kimi, Blender, Python or provider accounts.
+Claude Code, OpenCode, Kimi, Blender, Python or provider accounts.
 
 **Already using Mr. Mak?** Read the [0.1.1 update notes](CHANGELOG.md) for browser
 links, the terminal layout fix and the new chat effort default. Install the update
@@ -109,10 +110,10 @@ Three.js modeling, materials, motion references, Blender game animation, video
 inspection and dictation setup. Read the [skill index](docs/skills.md).
 
 The maintained instructions live in `.agents/skills`. Complete copies in
-`.claude/skills` include the same instructions and resources. Both agents get the
-full skills. Run `npm run skills:sync` after editing the maintained source.
-Copy a skill together with its referenced resources; keep `.env`, job receipts
-and account configuration private.
+`.claude/skills` include the same instructions and resources. OpenCode reads
+`.agents/skills`, `.claude/skills` and `.opencode/skills`. Run `npm run skills:sync`
+after editing the maintained source. Copy a skill together with its referenced
+resources; keep `.env`, job receipts and account configuration private.
 
 ## Optional voice and connections
 

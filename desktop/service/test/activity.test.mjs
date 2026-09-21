@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
 import { Sessions } from '../sessions.mjs';
 import { createService } from '../server.mjs';
-import { nativeActivity, tailNativeFile } from '../native-events.mjs';
+import { nativeActivity, tailNativeFile, tailOpenCodeSession } from '../native-events.mjs';
 import { sleep } from '../util.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -160,4 +160,28 @@ test('only the subscribed Chats view can acknowledge the exact answer; navigatio
     assert.equal(item.unread, true);
     await send(chats.ws, seen, chats.messages); assert.equal(item.unread, false);
   } finally { sockets.forEach(ws => ws.terminate()); await service.close(); }
+});
+
+test('OpenCode tailing detects started, completed and interrupted turns', async () => {
+  const repo = await mkdtemp(path.join(root, '.cache', 'opencode-activity-test-'));
+  const script = path.join(repo, 'mock-opencode.mjs');
+  const stateFile = path.join(repo, 'state.json');
+  await writeFile(script, `import { readFile } from 'node:fs/promises'; try { const file = process.argv.find(a => a.endsWith('state.json')); const state = file ? await readFile(file, 'utf8') : '{}'; console.log(state); } catch (err) { console.error('MOCKERR', err.message); process.exit(1); }`);
+  await writeFile(stateFile, JSON.stringify({ data: [] }));
+  const events = [];
+  const stop = tailOpenCodeSession(process.execPath, 'ses-test', event => events.push(event), null, { cwd: repo, binaryArgs: [script, stateFile], interval: 200 });
+  try {
+    await sleep(300);
+    await writeFile(stateFile, JSON.stringify({ data: [{ id: 'm1', type: 'assistant', time: { created: 1 }, content: [{ type: 'text', text: 'Working…' }] }] }));
+    await until(() => events.some(e => e.kind === 'turn-started'));
+    await writeFile(stateFile, JSON.stringify({ data: [{ id: 'm1', type: 'assistant', time: { created: 1, completed: 2 }, content: [{ type: 'text', text: 'Done.' }] }] }));
+    await until(() => events.some(e => e.kind === 'turn-completed'));
+    const completed = events.find(e => e.kind === 'turn-completed');
+    assert.equal(completed.id, 'm1'); assert.equal(completed.preview, 'Done.');
+    await writeFile(stateFile, JSON.stringify({ data: [{ id: 'm2', type: 'assistant', time: { created: 3 }, content: [{ type: 'text', text: 'Wait…' }] }] }));
+    await until(() => events.filter(e => e.kind === 'turn-started').length === 2);
+    await writeFile(stateFile, JSON.stringify({ data: [{ id: 'm3', type: 'user', time: { created: 4 }, text: 'Wait' }] }));
+    await until(() => events.some(e => e.kind === 'turn-interrupted'));
+    assert.deepEqual(events.map(e => e.kind), ['turn-started', 'turn-completed', 'turn-started', 'turn-interrupted']);
+  } finally { stop(); }
 });

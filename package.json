@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "desktop:service": "node desktop/service/main.mjs",
     "desktop:prepare": "node desktop/prepare.mjs",
+    "desktop:sync-service": "node scripts/sync-desktop-service.mjs",
     "desktop:build": "tauri build",
     "desktop:dev": "tauri dev",
     "desktop:test": "node --test desktop/service/test/*.test.mjs",

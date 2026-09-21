@@ -58,7 +58,7 @@ export class Files {
       return { name: entry.name, path: full, directory: info?.isDirectory() || entry.isDirectory(), size: info?.size || 0, modifiedAt: info?.mtime.toISOString() || null };
     }));
     if (atRoot && mode !== 'all') {
-      for (const [name, relative] of [['Claude skills', '.claude/skills'], ['Codex skills', '.agents/skills']]) {
+      for (const [name, relative] of [['Claude skills', '.claude/skills'], ['Codex skills', '.agents/skills'], ['OpenCode skills', '.opencode/skills']]) {
         const full = path.join(this.repo, relative), info = await stat(full).catch(() => null);
         if (info?.isDirectory()) result.push({ name, path: full, directory: true, size: 0, modifiedAt: info.mtime.toISOString() });
       }

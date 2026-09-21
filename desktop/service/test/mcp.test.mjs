@@ -10,7 +10,8 @@ import { childEnvironment } from '../agents.mjs';
 async function fixture(options = {}) {
   const base = await mkdtemp(path.join(os.tmpdir(), 'mrmak-mcp-test-'));
   const repo = path.join(base, 'project'), home = path.join(base, 'home');
-  for (const root of [repo, home]) for (const dir of ['.claude', '.codex', '.kimi-code', '.cursor']) await mkdir(path.join(root, dir), { recursive: true });
+  for (const root of [repo, home]) for (const dir of ['.claude', '.codex', '.kimi-code', '.cursor', '.opencode']) await mkdir(path.join(root, dir), { recursive: true });
+  await mkdir(path.join(home, '.config', 'opencode'), { recursive: true });
   const json = (file, value) => writeFile(file, JSON.stringify(value));
   const inventory = new McpInventory(repo, { home, env: { PATH: process.env.PATH, APPDATA: path.join(home, 'appdata') }, ...options });
   return { repo, home, json, inventory };
@@ -107,4 +108,17 @@ test('agent environment forwards only explicitly scoped MCP values from the proj
   const env=childEnvironment(repo);
   assert.equal(env.MRMAK_MCP_FIXTURE_VALUE,'mcp-value');
   assert.notEqual(env.OPENAI_KEY,'private-voice-key'); assert.notEqual(env.UNRELATED_FIXTURE_KEY,'private-value');
+});
+
+test('MCP discovery reads OpenCode global and project configs', async () => {
+  const { repo, home, json, inventory } = await fixture();
+  await json(path.join(home, '.config', 'opencode', 'opencode.json'), { mcp: { global_server: { type: 'local', command: ['echo', 'global'] } } });
+  await json(path.join(repo, '.opencode', 'opencode.json'), { mcp: { project_server: { type: 'local', command: [process.execPath, '-e', 'project'] }, remote_server: { type: 'sse', url: 'https://example.test/sse' } } });
+  const result = await inventory.list();
+  const globalServer = result.servers.find(s => s.client === 'opencode' && s.name === 'global_server');
+  const projectServer = result.servers.find(s => s.client === 'opencode' && s.name === 'project_server');
+  const remoteServer = result.servers.find(s => s.client === 'opencode' && s.name === 'remote_server');
+  assert.ok(globalServer); assert.equal(globalServer.scope, 'global'); assert.equal(globalServer.transport, 'stdio'); assert.equal(globalServer.executable, 'echo');
+  assert.ok(projectServer); assert.equal(projectServer.scope, 'project'); assert.equal(projectServer.transport, 'stdio'); assert.equal(projectServer.executable, path.basename(process.execPath));
+  assert.ok(remoteServer); assert.equal(remoteServer.scope, 'project'); assert.equal(remoteServer.transport, 'sse'); assert.equal(remoteServer.endpoint, 'https://example.test');
 });

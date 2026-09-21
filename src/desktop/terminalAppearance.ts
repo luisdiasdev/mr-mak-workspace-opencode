@@ -37,6 +37,9 @@ export function terminalRoles(lines: { text: string; wrapped?: boolean }[], agen
       else if (/^[⏺●]\s/u.test(text)) role = /^[⏺●]\s+(?:Bash|Read|Write|Edit|Update|Search|Grep|Glob|Task|Agent|Skill|WebFetch|WebSearch|Fetch|NotebookEdit|TodoWrite)\s*\(/u.test(text) ? 'detail' : 'agent'
       else if (/^\s*[⎿└│├]/u.test(text)) return 'detail'
       else if (/^\s*(?:[─━]{5,}|[✻✽✶✳✢·]\s|\? for shortcuts|bypass permissions|accept edits)/u.test(text)) return 'detail'
+    } else if (agent === 'opencode') {
+      if (/^[❯>]\s/u.test(text)) role = 'user'
+      else if (/^\s*(?:[─━]{5,}|\? for help|auto-approve)/u.test(text)) return 'detail'
     }
     return role
   })
@@ -45,7 +48,7 @@ export function terminalRoles(lines: { text: string; wrapped?: boolean }[], agen
 type RowDecoration = { marker: IMarker; decorations: IDecoration[]; signature: string }
 
 export function decorateTerminal(terminal: Terminal, agent: AgentId) {
-  if (agent !== 'codex' && agent !== 'claude') return () => {}
+  if (agent !== 'codex' && agent !== 'claude' && agent !== 'opencode') return () => {}
   let rows: RowDecoration[] = [], timer = 0, disposed = false
   const remove = (row: RowDecoration) => { row.decorations.forEach(item => item.dispose()); row.marker.dispose() }
   const clear = () => { rows.forEach(remove); rows = [] }
