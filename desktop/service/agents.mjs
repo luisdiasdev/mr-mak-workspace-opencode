@@ -116,10 +116,19 @@ export function opencodeBinary(env = process.env) {
 
 export async function createOpenCodeSession(cwd, title) {
   const binary = opencodeBinary();
-  const { stdout } = await execFileAsync(binary, ['api', 'POST', '/api/session', '-d', JSON.stringify({ title: String(title || 'Mr. Mak chat').slice(0, 200) })], { cwd, encoding: 'utf8', timeout: 20000 });
+  const body = JSON.stringify({
+    title: String(title || 'Mr. Mak chat').slice(0, 200),
+    location: { directory: cwd },
+  });
+  const { stdout } = await execFileAsync(binary, ['api', 'POST', '/api/session', '-d', body], { cwd, encoding: 'utf8', timeout: 20000 });
   const result = JSON.parse(stdout);
   if (!result.data?.id) throw new Error('OpenCode did not return a session ID');
   return result.data.id;
+}
+
+export async function moveOpenCodeSession(cwd, sessionId) {
+  const binary = opencodeBinary();
+  await execFileAsync(binary, ['api', 'POST', `/api/session/${sessionId}/move`, '-d', JSON.stringify({ directory: cwd })], { cwd, encoding: 'utf8', timeout: 10000 });
 }
 
 export function terminalCommand(agent, { bypass = false, resumeId, nativeId, effort } = {}) {

@@ -6,7 +6,7 @@ import os from 'node:os';
 import pty from 'node-pty';
 import headless from '@xterm/headless';
 import serialize from '@xterm/addon-serialize';
-import { terminalCommand, childEnvironment, createOpenCodeSession, opencodeBinary } from './agents.mjs';
+import { terminalCommand, childEnvironment, createOpenCodeSession, moveOpenCodeSession, opencodeBinary } from './agents.mjs';
 import { readJson, saveJson } from './util.mjs';
 import { claudeTranscript, codexTranscript, tailNativeFile, opencodeBoundary, tailOpenCodeSession } from './native-events.mjs';
 import { englishTitle, restoredTitle } from './titles.mjs';
@@ -394,6 +394,7 @@ export class Sessions extends EventEmitter {
       throw new Error('The native conversation could not be located. Your last screen is retained; use New chat → Resume to connect its CLI ID.');
     }
     if (resumeId) session.nativeId = resumeId;
+    if (session.agent === 'opencode' && resumeId) await moveOpenCodeSession(session.cwd, resumeId).catch(() => {});
     // Capture the boundary before launching the resumed CLI. Even an immediate
     // submitted task must be observed, while historic answers stay acknowledged.
     const nativeWatch = await this.nativeBoundary(session, resumeId);
