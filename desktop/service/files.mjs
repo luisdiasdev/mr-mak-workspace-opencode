@@ -58,13 +58,32 @@ export class Files {
       return { name: entry.name, path: full, directory: info?.isDirectory() || entry.isDirectory(), size: info?.size || 0, modifiedAt: info?.mtime.toISOString() || null };
     }));
     if (atRoot && mode !== 'all') {
-      for (const [name, relative] of [['Claude skills', '.claude/skills'], ['Codex skills', '.agents/skills'], ['OpenCode skills', '.opencode/skills']]) {
-        const full = path.join(this.repo, relative), info = await stat(full).catch(() => null);
-        if (info?.isDirectory()) result.push({ name, path: full, directory: true, size: 0, modifiedAt: info.mtime.toISOString() });
-      }
+      for (const { name, path: full, modifiedAt } of await this.skillLocations()) result.push({ name, path: full, directory: true, size: 0, modifiedAt });
     }
     result.sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name));
     return { path: actual, parent: path.dirname(actual), entries: result, truncated: filtered.length > 1500, mode };
+  }
+  // .agents/skills is the cross-agent standard and the maintained source. Agent-specific
+  // folders are surfaced only when they actually hold skills, so an empty placeholder
+  // (for example a lone .gitkeep) never appears as a peer location.
+  async skillLocations() {
+    const candidates = [
+      ['Shared Skills', 'Shared skills', '.agents/skills', true],
+      ['Claude', 'Claude skills', '.claude/skills', false],
+      ['OpenCode', 'OpenCode skills', '.opencode/skills', false],
+    ];
+    const found = [];
+    for (const [label, name, relative, always] of candidates) {
+      const full = path.join(this.repo, relative);
+      const info = await stat(full).catch(() => null);
+      if (!info?.isDirectory()) continue;
+      if (!always) {
+        const entries = await readdir(full, { withFileTypes: true }).catch(() => []);
+        if (!entries.some(entry => !entry.name.startsWith('.'))) continue;
+      }
+      found.push({ label, name, path: full, modifiedAt: info.mtime.toISOString() });
+    }
+    return found;
   }
   async preview(file) {
     const actual = await realpath(path.resolve(file));

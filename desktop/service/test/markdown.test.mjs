@@ -25,12 +25,17 @@ test('Markdown saves preserve Unicode, keep a recovery copy, and reject stale or
   assert.equal(await readFile(path.join(repo, 'script.js'), 'utf8'), 'original');
 });
 
-test('Main folders expose local Claude and Codex skills alongside knowledge and processes', async () => {
+test('Main folders expose the shared skills source and only non-empty agent copies', async () => {
   const repo = await mkdtemp(path.resolve('.cache/skill-folders-'));
   for (const folder of ['.claude/skills', '.agents/skills', '.opencode/skills', 'knowledge', 'processes', 'context', 'inbox', 'projects', 'workspace', 'node_modules']) await mkdir(path.join(repo, folder), { recursive: true });
-  const result = await new Files(repo).list();
-  assert.deepEqual(result.entries.map(item => item.name).sort(), ['Claude skills', 'Codex skills', 'OpenCode skills', 'context', 'inbox', 'knowledge', 'processes', 'projects', 'workspace']);
+  await mkdir(path.join(repo, '.agents', 'skills', 'plan'));
+  await mkdir(path.join(repo, '.claude', 'skills', 'plan'));
+  await writeFile(path.join(repo, '.opencode', 'skills', '.gitkeep'), '');
+  const files = new Files(repo);
+  const result = await files.list();
+  assert.deepEqual(result.entries.map(item => item.name).sort(), ['Claude skills', 'Shared skills', 'context', 'inbox', 'knowledge', 'processes', 'projects', 'workspace']);
   assert.ok(result.entries.every(entry => entry.directory && path.isAbsolute(entry.path)));
+  assert.deepEqual((await files.skillLocations()).map(location => location.label), ['Shared Skills', 'Claude']);
 });
 
 test('Windows preference is confirmed by native host, synchronizes tray changes and reports failure', async () => {

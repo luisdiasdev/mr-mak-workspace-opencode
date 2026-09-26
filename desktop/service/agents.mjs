@@ -40,44 +40,39 @@ function nvmVersionRoots(dir) {
   return roots;
 }
 
+// Global npm packages live in `<prefix>/node_modules`, where the prefix is the
+// directory npm installs its launchers into. Derive those prefixes from the
+// running environment rather than listing Windows install locations: the
+// launchers already found on PATH, the prefix npm reports, the standard
+// per-user prefix, and the roots that Node version managers export. A prefix
+// is a candidate even when the service starts with a trimmed PATH, because
+// commandPath also checks the user's npm folders.
+export function npmGlobalRoots(env = process.env) {
+  const roots = new Set();
+  const add = value => { if (typeof value === 'string' && value.trim()) roots.add(path.resolve(value)); };
+  for (const launcher of ['npm', 'node', 'opencode2', 'codex']) {
+    const found = commandPath(launcher, env);
+    if (found) add(path.dirname(found));
+  }
+  add(env.npm_config_prefix);
+  add(env.NPM_CONFIG_PREFIX);
+  add(env.NVM_SYMLINK);
+  for (const version of nvmVersionRoots(env.NVM_HOME)) add(version);
+  if (env.APPDATA) add(path.join(env.APPDATA, 'npm'));
+  for (const home of new Set([env.USERPROFILE, env.HOME, os.homedir()].filter(Boolean))) add(path.join(home, 'AppData', 'Roaming', 'npm'));
+  return [...roots];
+}
+
+const OPENCODE_BINARY = path.join('node_modules', '@opencode', 'cli', 'bin', 'opencode.exe');
+
 function resolveOpenCode(env = process.env) {
   const launcher = commandPath('opencode2', env);
   if (launcher) {
-    const exe = path.join(path.dirname(launcher), 'node_modules', '@opencode', 'cli', 'bin', 'opencode.exe');
+    const exe = path.join(path.dirname(launcher), OPENCODE_BINARY);
     if (existsSync(exe)) return { launcher, exe };
   }
-  // The service may be launched from an installer or another terminal with a
-  // different profile or environment, so search well-known roots using both
-  // env.USERPROFILE and os.homedir().
-  const homes = new Set([env.USERPROFILE, env.HOME, os.homedir()].filter(Boolean));
-  const roots = [];
-  const add = (dir, options = {}) => {
-    if (!dir) return;
-    roots.push({ dir, isNvm: options.isNvm || /\bnvm\b/i.test(dir) });
-  };
-  add(path.join(env.APPDATA || '', 'npm'));
-  add(path.join(env.LOCALAPPDATA || '', 'nvm'), { isNvm: true });
-  for (const home of homes) {
-    add(path.join(home, 'AppData', 'Roaming', 'npm'));
-    add(path.join(home, 'AppData', 'Local', 'nvm'), { isNvm: true });
-    add(path.join(home, 'scoop', 'apps', 'nodejs', 'current'));
-    add(path.join(home, 'scoop', 'shims'));
-    add(path.join(home, '.local', 'bin'));
-  }
-  add(path.join('C:', 'nvm4w', 'nodejs'), { isNvm: true });
-  add(path.join('C:', 'nvm4w'));
-  add(path.join(env.ProgramFiles || '', 'nodejs'));
-  add(path.join(env['ProgramFiles(x86)'] || '', 'nodejs'));
-  add(path.join('C:', 'Program Files', 'nodejs'));
-  add(path.join('C:', 'Program Files (x86)', 'nodejs'));
-  add(path.join('C:', 'ProgramData', 'nvm'), { isNvm: true });
-  const expanded = [];
-  for (const { dir, isNvm } of roots) {
-    if (isNvm) expanded.push(...nvmVersionRoots(dir));
-    expanded.push(dir);
-  }
-  for (const root of expanded) {
-    const exe = path.join(root, 'node_modules', '@opencode', 'cli', 'bin', 'opencode.exe');
+  for (const root of npmGlobalRoots(env)) {
+    const exe = path.join(root, OPENCODE_BINARY);
     if (existsSync(exe)) return { launcher: path.join(root, 'opencode2.ps1'), exe };
   }
   return null;
@@ -92,17 +87,21 @@ export function inventory(env = process.env) {
 
 // Resolve the real Codex binary when available so JSON-RPC does not pass through a shell.
 export function codexBinary(env = process.env) {
-  const npmRoot = path.join(env.APPDATA || '', 'npm', 'node_modules', '@openai');
+  const openaiRoots = npmGlobalRoots(env).map(root => path.join(root, 'node_modules', '@openai'));
   const triple = process.arch === 'arm64' ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-msvc';
   const platformPackage = `codex-win32-${process.arch}`;
-  for (const root of [path.join(npmRoot, 'codex', 'node_modules', '@openai', platformPackage), path.join(npmRoot, platformPackage), path.join(npmRoot, 'codex')]) {
-    for (const directory of ['bin', 'codex']) {
-      const candidate = path.join(root, 'vendor', triple, directory, 'codex.exe');
-      if (existsSync(candidate)) return { file: candidate, args: [] };
+  for (const npmRoot of openaiRoots) {
+    for (const root of [path.join(npmRoot, 'codex', 'node_modules', '@openai', platformPackage), path.join(npmRoot, platformPackage), path.join(npmRoot, 'codex')]) {
+      for (const directory of ['bin', 'codex']) {
+        const candidate = path.join(root, 'vendor', triple, directory, 'codex.exe');
+        if (existsSync(candidate)) return { file: candidate, args: [] };
+      }
     }
   }
-  const js = path.join(npmRoot, 'codex', 'bin', 'codex.js');
-  if (existsSync(js)) return { file: process.execPath, args: [js] };
+  for (const npmRoot of openaiRoots) {
+    const js = path.join(npmRoot, 'codex', 'bin', 'codex.js');
+    if (existsSync(js)) return { file: process.execPath, args: [js] };
+  }
   const executable = commandPath('codex', env);
   if (executable && !/\.(cmd|bat|ps1)$/i.test(executable)) return { file: executable, args: [] };
   throw new Error('Codex CLI is not installed. Install it and sign in once to use Mr. Mak.');

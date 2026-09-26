@@ -175,6 +175,7 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
         if (method === 'GET' && url.pathname === '/api/history') return json(response, 200, history(url.searchParams.get('q') || ''));
         if (method === 'POST' && url.pathname === '/api/history/import') return json(response, 201, await sessions.importConversation(data));
         if (method === 'GET' && url.pathname === '/api/files') return json(response, 200, await files.list(url.searchParams.get('path') || repo, url.searchParams.get('mode') || 'main', url.searchParams.get('q') || ''));
+        if (method === 'GET' && url.pathname === '/api/skills') return json(response, 200, await files.skillLocations());
         if (method === 'POST' && url.pathname === '/api/files/pick') {
           if (typeof data.requestId !== 'string' || !/^[a-f\d-]{36}$/i.test(data.requestId)) throw new Error('Invalid file picker request.');
           native({ type: 'pick-files', window: 'chats', requestId: data.requestId });
