@@ -9,6 +9,7 @@ import MakText from './MakText'
 interface SidebarProps {
   pinned: WorkspaceEntity[]
   grouped: Map<string, WorkspaceEntity[]>
+  archived: WorkspaceEntity[]
   activeId: string | null
   query: string
   onQuery: (q: string) => void
@@ -22,11 +23,11 @@ interface SidebarProps {
   onCollapse: () => void
 }
 
-function Item({ entity, active }: { entity: WorkspaceEntity; active: boolean }) {
+function Item({ entity, active, muted }: { entity: WorkspaceEntity; active: boolean; muted?: boolean }) {
   return (
     <a
       href={entityHash(entity.id)}
-      className={`sidebar-item${active ? ' active' : ''}${entity.pinned ? ' pinned' : ''}`}
+      className={`sidebar-item${active ? ' active' : ''}${entity.pinned ? ' pinned' : ''}${muted ? ' muted' : ''}`}
       aria-current={active ? 'page' : undefined}
     >
       <span className="item-icon" aria-hidden="true">
@@ -41,6 +42,7 @@ function Item({ entity, active }: { entity: WorkspaceEntity; active: boolean }) 
 export default function Sidebar({
   pinned,
   grouped,
+  archived,
   activeId,
   query,
   onQuery,
@@ -123,12 +125,31 @@ export default function Sidebar({
 
         {empty && <div className="sidebar-empty">Nothing matches, sir.</div>}
 
-        {archivedCount > 0 && !query && (
-          <button className="sidebar-archive-toggle" onClick={onToggleArchived}>
-            {showArchived
-              ? `▼ Hide archive (${archivedCount})`
-              : `▶ Show archive (${archivedCount})`}
-          </button>
+        {archivedCount > 0 && (
+          <div className="sidebar-archive">
+            {!query && (
+              <button
+                className="sidebar-archive-toggle"
+                onClick={onToggleArchived}
+                aria-expanded={showArchived}
+              >
+                {showArchived
+                  ? `▼ Hide archive (${archivedCount})`
+                  : `▶ Show archive (${archivedCount})`}
+              </button>
+            )}
+            {(showArchived || query) && archived.length > 0 && (
+              <div>
+                <div className="sidebar-section">
+                  <span className="sidebar-label">{'\u{1F5C4}\u{FE0F}'} archived</span>
+                  <span className="sidebar-count">{archived.length}</span>
+                </div>
+                {archived.map(e => (
+                  <Item key={e.id} entity={e} active={e.id === activeId} muted />
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </nav>
 

@@ -286,6 +286,14 @@ button:focus-visible {
   box-shadow: var(--glow-amber);
 }
 
+.sidebar-item.muted {
+  opacity: 0.62;
+}
+.sidebar-item.muted:hover,
+.sidebar-item.muted.active {
+  opacity: 0.85;
+}
+
 .item-icon {
   width: 18px;
   text-align: center;
@@ -601,20 +609,20 @@ button:focus-visible {
     background var(--t-med) var(--ease);
 }
 .mak-card:hover,
-.mak-card:focus-visible {
+.mak-card:focus-within {
   transform: translateY(-2px);
   background:
     linear-gradient(160deg, rgba(28, 28, 35, 0.88), rgba(17, 17, 22, 0.88)) padding-box,
     var(--edge) border-box;
   box-shadow: var(--shadow-2), var(--glow-pink);
 }
-.mak-card:focus-visible {
+.mak-card:focus-within {
   box-shadow: var(--shadow-2), var(--glow-pink), var(--focus-ring);
 }
 
 .mak-card.pinned,
 .mak-card.pinned:hover,
-.mak-card.pinned:focus-visible {
+.mak-card.pinned:focus-within {
   background:
     linear-gradient(160deg, rgba(26, 24, 20, 0.85), rgba(16, 15, 12, 0.85)) padding-box,
     var(--edge-amber) border-box;
@@ -698,9 +706,85 @@ button:focus-visible {
   transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease);
 }
 .mak-card:hover .card-open,
-.mak-card:focus-visible .card-open {
+.mak-card:focus-within .card-open {
   opacity: 1;
   transform: none;
+}
+
+/* Stretched link keeps the whole card navigable while the action buttons
+   sit above it. */
+.card-link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+.card-link:focus-visible {
+  box-shadow: none;
+}
+
+/* Hover menu — pin/unpin and archive/unarchive. */
+.card-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease);
+}
+.mak-card:hover .card-actions,
+.mak-card:focus-within .card-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+.card-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-dim);
+  background: var(--surface-solid);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+.card-action:hover {
+  color: var(--text-bright);
+  border-color: var(--pink);
+  background: var(--pink-dim);
+}
+.card-action.on {
+  color: var(--amber);
+  border-color: rgba(234, 181, 110, 0.4);
+  background: var(--amber-dim);
+}
+.card-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.entity-card.archived {
+  opacity: 0.78;
+}
+.entity-card.archived:hover,
+.entity-card.archived:focus-within {
+  opacity: 1;
+}
+
+.card-error {
+  font-size: 0.66rem;
+  line-height: 1.4;
+  color: var(--red);
 }
 
 /* ─── Mr. Mak logo container ─── */

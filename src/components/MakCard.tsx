@@ -1,4 +1,5 @@
-import type { WorkspaceEntity } from '../types'
+import { useState } from 'react'
+import type { WorkspaceEntity, WorkspaceUpdate } from '../types'
 import { entityHash } from '../lib/route'
 import { categoryIcon } from '../lib/categories'
 import { contentUrl } from '../desktop/client'
@@ -8,15 +9,68 @@ import { contentUrl } from '../desktop/client'
  * (pink→purple; amber when pinned), glow + lift on hover. Building
  * block of the home grid; mirrored as `.mak-card` in
  * scripts/shared/report_style.py for generated reports.
+ *
+ * The whole surface navigates to the entity via a stretched link; a small
+ * action menu floats over the top-right corner on hover to pin/unpin and
+ * archive/unarchive.
  */
-export default function MakCard({ entity }: { entity: WorkspaceEntity }) {
+export default function MakCard({
+  entity,
+  archived = false,
+  onUpdate,
+}: {
+  entity: WorkspaceEntity
+  archived?: boolean
+  onUpdate: (id: string, patch: WorkspaceUpdate) => Promise<void> | void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const steps = entity.steps.length
+
+  const run = async (patch: WorkspaceUpdate) => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      await onUpdate(entity.id, patch)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update the card.')
+      window.setTimeout(() => setError(null), 4000)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
-    <a
-      href={entityHash(entity.id)}
-      className={`mak-card entity-card${entity.pinned ? ' pinned' : ''}`}
+    <article
+      className={`mak-card entity-card${entity.pinned ? ' pinned' : ''}${archived ? ' archived' : ''}`}
       data-entity={entity.id}
     >
+      <a className="card-link" href={entityHash(entity.id)} aria-label={`Open ${entity.title}`} />
+
+      <div className="card-actions">
+        <button
+          type="button"
+          className={`card-action${entity.pinned ? ' on' : ''}`}
+          disabled={busy}
+          title={entity.pinned ? 'Unpin' : 'Pin'}
+          aria-label={entity.pinned ? `Unpin ${entity.title}` : `Pin ${entity.title}`}
+          onClick={() => run({ pinned: !entity.pinned })}
+        >
+          {'\u{1F4CC}'}
+        </button>
+        <button
+          type="button"
+          className={`card-action${archived ? ' on' : ''}`}
+          disabled={busy}
+          title={archived ? 'Unarchive' : 'Archive'}
+          aria-label={archived ? `Unarchive ${entity.title}` : `Archive ${entity.title}`}
+          onClick={() => run({ status: archived ? 'active' : 'archived' })}
+        >
+          {'\u{1F5C4}\u{FE0F}'}
+        </button>
+      </div>
+
       <div className="card-top">
         <span className="chip">
           <span aria-hidden="true">{categoryIcon(entity.category)}</span>
@@ -43,6 +97,8 @@ export default function MakCard({ entity }: { entity: WorkspaceEntity }) {
           open →
         </span>
       </div>
-    </a>
+
+      {error && <span className="card-error" role="alert">{error}</span>}
+    </article>
   )
 }

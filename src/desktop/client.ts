@@ -68,6 +68,9 @@ export async function uploadFile(file: File, folder: string): Promise<{ path: st
   if (!response.ok) throw new Error(value.error || 'File could not be copied')
   return value
 }
+export function updateEntity(id: string, patch: { pinned?: boolean; status?: 'active' | 'done' | 'archived' }) {
+  return api(`/workspace/${encodeURIComponent(id)}`, patch, 'PATCH')
+}
 export function sendEvent(value: unknown) {
   if (socket?.readyState !== WebSocket.OPEN) return false
   socket.send(JSON.stringify(value)); return true

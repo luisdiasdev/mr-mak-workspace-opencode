@@ -34,6 +34,12 @@ export interface WorkspaceState {
   entities: WorkspaceEntity[]
 }
 
+/** Metadata patch accepted by the card hover menu (pin/unpin, archive/unarchive). */
+export interface WorkspaceUpdate {
+  pinned?: boolean
+  status?: WorkspaceEntity['status']
+}
+
 /* ─── 3D comparison steps ─────────────────────────────────────────────────
    A manifest lives inside the entity folder next to a models/ directory. Paths
    in `file` are relative to the manifest. Model binaries stay local (gitignored,

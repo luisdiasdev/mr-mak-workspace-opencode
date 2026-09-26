@@ -1,4 +1,4 @@
-import type { WorkspaceEntity } from '../types'
+import type { WorkspaceEntity, WorkspaceUpdate } from '../types'
 import { categoryIcon } from '../lib/categories'
 import MakCard from './MakCard'
 import MakLogo from './MakLogo'
@@ -7,9 +7,12 @@ interface HomeGridProps {
   entities: WorkspaceEntity[]
   pinned: WorkspaceEntity[]
   grouped: Map<string, WorkspaceEntity[]>
+  archived: WorkspaceEntity[]
+  showArchived: boolean
   offline: boolean
   searching: boolean
   query: string
+  onUpdate: (id: string, patch: WorkspaceUpdate) => Promise<void> | void
 }
 
 function greeting(): string {
@@ -24,13 +27,17 @@ export default function HomeGrid({
   entities,
   pinned,
   grouped,
+  archived,
+  showArchived,
   offline,
   searching,
   query,
+  onUpdate,
 }: HomeGridProps) {
   const activeCount = entities.filter(e => e.status === 'active').length
   const categoryCount = new Set(entities.map(e => e.category || 'other')).size
-  const shown = pinned.length + [...grouped.values()].reduce((n, list) => n + list.length, 0)
+  const showArchive = showArchived || searching
+  const shown = pinned.length + [...grouped.values()].reduce((n, list) => n + list.length, 0) + (showArchive ? archived.length : 0)
 
   return (
     <div className="home">
@@ -61,7 +68,7 @@ export default function HomeGrid({
           </div>
           <div className="card-grid">
             {pinned.map(e => (
-              <MakCard key={e.id} entity={e} />
+              <MakCard key={e.id} entity={e} onUpdate={onUpdate} />
             ))}
           </div>
         </section>
@@ -77,11 +84,25 @@ export default function HomeGrid({
           </div>
           <div className="card-grid">
             {list.map(e => (
-              <MakCard key={e.id} entity={e} />
+              <MakCard key={e.id} entity={e} onUpdate={onUpdate} />
             ))}
           </div>
         </section>
       ))}
+
+      {showArchive && archived.length > 0 && (
+        <section className="home-section home-archive">
+          <div className="section-head">
+            <span className="section-title">{'\u{1F5C4}\u{FE0F}'} archived</span>
+            <span className="section-count">{archived.length}</span>
+          </div>
+          <div className="card-grid">
+            {archived.map(e => (
+              <MakCard key={e.id} entity={e} archived onUpdate={onUpdate} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {shown === 0 && !searching && (
         <div className="home-empty">

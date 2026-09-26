@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { WorkspaceState } from '../types'
-import { api, isDesktop } from '../desktop/client'
+import type { WorkspaceState, WorkspaceUpdate } from '../types'
+import { api, isDesktop, updateEntity } from '../desktop/client'
 
 const POLL_MS = 30_000
 const ARCHIVE_DAYS = 7
@@ -62,5 +62,25 @@ export function useWorkspace() {
     }
   }, [reload])
 
-  return { workspace, offline, lastSync }
+  // Pin/unpin and archive/unarchive. The desktop service writes workspace.json
+  // and broadcasts `workspace-changed`; the browser-only dev server has its own
+  // tiny PATCH fallback. Either way we reload once the file settles.
+  const update = useCallback(async (id: string, patch: WorkspaceUpdate) => {
+    if (isDesktop) {
+      await updateEntity(id, patch)
+    } else {
+      const res = await fetch(`/api/workspace/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      if (!res.ok) {
+        const value = await res.json().catch(() => ({}))
+        throw new Error(value.error || 'The card could not be updated.')
+      }
+    }
+    await reload()
+  }, [reload])
+
+  return { workspace, offline, lastSync, update }
 }

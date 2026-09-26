@@ -20,7 +20,7 @@ const byFreshness = (a: WorkspaceEntity, b: WorkspaceEntity) =>
   lastTouched(b).localeCompare(lastTouched(a)) || statusRank(a) - statusRank(b)
 
 export default function App() {
-  const { workspace, offline, lastSync } = useWorkspace()
+  const { workspace, offline, lastSync, update } = useWorkspace()
   const [route, setRoute] = useState<Route>(parseHash)
   const [query, setQuery] = useState('')
   const [showArchived, setShowArchived] = useState(false)
@@ -104,20 +104,18 @@ export default function App() {
 
   // Search digs through everything, archive included; otherwise the
   // archive stays hidden behind the toggle.
-  const visible = entities.filter(
-    e => matchesQuery(e) && (searching || showArchived || !isArchived(e)),
-  )
+  const archived = entities.filter(e => isArchived(e) && matchesQuery(e)).sort(byFreshness)
   const archivedCount = entities.filter(isArchived).length
 
-  const pinned = visible.filter(e => e.pinned).sort(byFreshness)
-  const rest = visible.filter(e => !e.pinned).sort(byFreshness)
-  // Category grouping is for the short working set only. With the archive open or a
-  // search running the list is long and the useful order is purely "what did I touch
-  // last", so buckets are dropped and everything stays in one date-sorted run.
-  const flat = showArchived || searching
+  const active = entities.filter(e => !isArchived(e) && matchesQuery(e))
+  const pinned = active.filter(e => e.pinned).sort(byFreshness)
+  const rest = active.filter(e => !e.pinned).sort(byFreshness)
+  // Category grouping is for the short working set only. With a search running
+  // the list is long and the useful order is purely "what did I touch last", so
+  // buckets are dropped and everything stays in one date-sorted run.
   const grouped = new Map<string, WorkspaceEntity[]>()
   for (const e of rest) {
-    const cat = flat ? 'by date' : e.category || 'other'
+    const cat = searching ? 'by date' : e.category || 'other'
     if (!grouped.has(cat)) grouped.set(cat, [])
     grouped.get(cat)!.push(e)
   }
@@ -127,6 +125,7 @@ export default function App() {
       <Sidebar
         pinned={pinned}
         grouped={grouped}
+        archived={archived}
         activeId={route.id}
         query={query}
         onQuery={setQuery}
@@ -174,9 +173,12 @@ export default function App() {
               entities={entities}
               pinned={pinned}
               grouped={grouped}
+              archived={archived}
+              showArchived={showArchived}
               offline={offline}
               searching={searching}
               query={query}
+              onUpdate={update}
             />
           )}
         </div>
