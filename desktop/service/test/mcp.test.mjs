@@ -112,13 +112,22 @@ test('agent environment forwards only explicitly scoped MCP values from the proj
 
 test('MCP discovery reads OpenCode global and project configs', async () => {
   const { repo, home, json, inventory } = await fixture();
-  await json(path.join(home, '.config', 'opencode', 'opencode.json'), { mcp: { global_server: { type: 'local', command: ['echo', 'global'] } } });
-  await json(path.join(repo, '.opencode', 'opencode.json'), { mcp: { project_server: { type: 'local', command: [process.execPath, '-e', 'project'] }, remote_server: { type: 'sse', url: 'https://example.test/sse' } } });
+  await json(path.join(home, '.config', 'opencode', 'opencode.json'), { mcp: { servers: { global_server: { type: 'local', command: ['echo', 'global'] } } } });
+  await json(path.join(repo, '.opencode', 'opencode.json'), { mcp: { servers: { project_server: { type: 'local', command: [process.execPath, '-e', 'project'] }, remote_server: { type: 'remote', url: 'https://example.test/mcp' } }, timeout: { startup: 45000 } } });
   const result = await inventory.list();
   const globalServer = result.servers.find(s => s.client === 'opencode' && s.name === 'global_server');
   const projectServer = result.servers.find(s => s.client === 'opencode' && s.name === 'project_server');
   const remoteServer = result.servers.find(s => s.client === 'opencode' && s.name === 'remote_server');
   assert.ok(globalServer); assert.equal(globalServer.scope, 'global'); assert.equal(globalServer.transport, 'stdio'); assert.equal(globalServer.executable, 'echo');
   assert.ok(projectServer); assert.equal(projectServer.scope, 'project'); assert.equal(projectServer.transport, 'stdio'); assert.equal(projectServer.executable, path.basename(process.execPath));
-  assert.ok(remoteServer); assert.equal(remoteServer.scope, 'project'); assert.equal(remoteServer.transport, 'sse'); assert.equal(remoteServer.endpoint, 'https://example.test');
+  assert.ok(remoteServer); assert.equal(remoteServer.scope, 'project'); assert.equal(remoteServer.transport, 'http'); assert.equal(remoteServer.endpoint, 'https://example.test');
+  assert.ok(!result.servers.find(s => s.client === 'opencode' && (s.name === 'servers' || s.name === 'timeout')));
+});
+
+test('MCP discovery still reads legacy flat OpenCode configs', async () => {
+  const { repo, json, inventory } = await fixture();
+  await json(path.join(repo, '.opencode', 'opencode.json'), { mcp: { legacy_server: { type: 'local', command: ['echo', 'legacy'] } } });
+  const result = await inventory.list();
+  const legacyServer = result.servers.find(s => s.client === 'opencode' && s.name === 'legacy_server');
+  assert.ok(legacyServer); assert.equal(legacyServer.scope, 'project'); assert.equal(legacyServer.transport, 'stdio'); assert.equal(legacyServer.executable, 'echo');
 });

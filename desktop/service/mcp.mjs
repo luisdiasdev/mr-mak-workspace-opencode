@@ -19,11 +19,17 @@ const merge = (base, next) => {
   for (const [name, value] of Object.entries(object(next))) result[name] = value && typeof value === 'object' && !Array.isArray(value) ? merge(result[name], value) : value;
   return result;
 };
-const expand = (text, env, missing) => String(text).replace(/\$\{([A-Za-z_][A-Za-z_0-9]*)(?::-([^}]*))?\}/g, (_, name, fallback) => {
-  if (env[name] != null && env[name] !== '') return env[name];
-  if (fallback != null) { if (!fallback && name.startsWith('MRMAK_MCP_')) missing.add(name); return fallback; }
-  missing.add(name); return '';
-});
+const expand = (text, env, missing) => String(text)
+  .replace(/\$\{([A-Za-z_][A-Za-z_0-9]*)(?::-([^}]*))?\}/g, (_, name, fallback) => {
+    if (env[name] != null && env[name] !== '') return env[name];
+    if (fallback != null) { if (!fallback && name.startsWith('MRMAK_MCP_')) missing.add(name); return fallback; }
+    missing.add(name); return '';
+  })
+  // OpenCode V2 substitutes `{env:NAME}`; other clients use `${NAME}`.
+  .replace(/\{env:([A-Za-z_][A-Za-z_0-9]*)\}/g, (_, name) => {
+    if (env[name] != null && env[name] !== '') return env[name];
+    missing.add(name); return '';
+  });
 const transform = (value, env, missing) => typeof value === 'string' ? expand(value, env, missing) : Array.isArray(value) ? value.map(item => transform(item, env, missing)) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, transform(v, env, missing)])) : value;
 
 export class McpInventory {
@@ -58,7 +64,18 @@ export class McpInventory {
         copy.args = copy.command.slice(1);
         copy.command = copy.command[0];
       }
+      // V2 names a local process environment `environment`; the rest of the
+      // inventory pipeline reads `env`.
+      if (!copy.env && copy.environment && typeof copy.environment === 'object' && !Array.isArray(copy.environment)) copy.env = copy.environment;
       return copy;
+    };
+    // V2 nests servers under `mcp.servers` next to `mcp.timeout`. V1 placed
+    // server names directly under `mcp`. Read both so a V2 config is not
+    // mistaken for a single server named "servers".
+    const openCodeServers = config => {
+      const mcp = object(config);
+      if (mcp.servers && typeof mcp.servers === 'object' && !Array.isArray(mcp.servers)) return object(mcp.servers);
+      return Object.fromEntries(Object.entries(mcp).filter(([name, value]) => name !== 'timeout' && value && typeof value === 'object' && !Array.isArray(value)));
     };
     const paths = {
       codexUser: path.join(codexHome, 'config.toml'), codexProject: path.join(this.repo, '.codex/config.toml'),
@@ -76,10 +93,10 @@ export class McpInventory {
     add('codex', 'project', paths.codexProject, values.codexProject.mcp_servers, 20);
     add('claude', 'global', paths.claudeUser, values.claudeUser.mcpServers, 10);
     add('claude', 'project', paths.claudeProject, values.claudeProject.mcpServers, 20);
-    const openCodeUserMcp = object(values.opencodeUser.mcp);
-    const openCodeProjectMcp = object(values.opencodeProject.mcp);
-    add('opencode', 'global', paths.opencodeUser, Object.fromEntries(Object.entries(openCodeUserMcp).map(([name, cfg]) => [name, normalizeOpenCode(cfg)])), 10);
-    add('opencode', 'project', paths.opencodeProject, Object.fromEntries(Object.entries(openCodeProjectMcp).map(([name, cfg]) => [name, normalizeOpenCode(cfg)])), 20);
+    const openCodeUserServers = openCodeServers(values.opencodeUser.mcp);
+    const openCodeProjectServers = openCodeServers(values.opencodeProject.mcp);
+    add('opencode', 'global', paths.opencodeUser, Object.fromEntries(Object.entries(openCodeUserServers).map(([name, cfg]) => [name, normalizeOpenCode(cfg)])), 10);
+    add('opencode', 'project', paths.opencodeProject, Object.fromEntries(Object.entries(openCodeProjectServers).map(([name, cfg]) => [name, normalizeOpenCode(cfg)])), 20);
     const localProject = Object.entries(object(values.claudeUser.projects)).find(([folder]) => key(folder) === key(this.repo))?.[1] || {};
     add('claude', 'local', paths.claudeUser, localProject.mcpServers, 30);
     const claudeSettings = merge(merge(values.claudeSettings, values.claudeProjectSettings), values.claudeLocalSettings);
