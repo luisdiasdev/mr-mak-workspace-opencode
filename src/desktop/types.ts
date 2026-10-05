@@ -11,7 +11,7 @@ export interface ChatSession {
   open: boolean; pinned: boolean; updatedAt: string; preview?: string; hasConversation?: boolean; restoreError?: string | null
 }
 export interface Notice { id: string; sessionId: string; name: string; kind: string; text: string; at: string }
-export interface Operation { id: string; text: string; status: string; result?: string; at: string }
+export interface Operation { id: string; text: string; status: string; result?: string; at: string; images?: string[] }
 export interface Settings { defaultAgent: AgentId; defaultBypass: boolean; terminalFontSize?: number; terminalAppearance?: 'focus' | 'original'; workspaceTheme?: 'dark' | 'light' | 'system'; workspaceRoute?: string | null; selectedId?: string | null; coordinatorEffort?: 'medium' | 'high'; voiceName?: string; voiceStyle?: string }
 export interface VoiceOwner { clientId: string; surface: 'chats' | 'workspace' }
 export interface FileEntry { name: string; path: string; directory: boolean; size: number; modifiedAt: string | null }

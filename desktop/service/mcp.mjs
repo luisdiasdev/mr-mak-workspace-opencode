@@ -140,7 +140,7 @@ export class McpInventory {
       let endpoint = ''; if (expanded.url) { try { endpoint = new URL(expanded.url).origin; } catch { endpoint = 'Invalid address'; } }
       const transport = config.type === 'sse' ? 'sse' : config.url ? 'http' : 'stdio';
       const readiness = disabled ? 'disabled' : hostManaged ? 'managed' : missing.size ? 'missing-env' : transport === 'stdio' && !executable ? 'missing-command' : approvalNeeded ? 'approval' : 'configured';
-      const fingerprint = digest([config, [...missing], headers, expanded.env, expanded.url, cwd, executable]);
+      const fingerprint = digest([config, [...missing], headers, expanded.env, expanded.url, cwd, executable, disabled, hostManaged, approvalNeeded]);
       const checked = this.checks.get(id);
       const connection = checked?.fingerprint === fingerprint ? { ...checked.result, stale: Date.now() - Date.parse(checked.result.checkedAt) > 5 * 60000 } : null;
       const data = {
@@ -148,7 +148,7 @@ export class McpInventory {
         endpoint, executable: config.command ? path.basename(expanded.command) : null, plugin: winner.plugin || null,
         sources: [...layers].reverse().map(item => ({ scope: item.scope, path: item.file, effective: item === winner })),
         missingEnv: [...missing], credentialNames: Object.keys(headers), connection,
-        canCheck: !disabled && !hostManaged && !missing.size && (transport !== 'stdio' || !!executable) && !config.http_headers_helper,
+        canCheck: !disabled && !hostManaged && !approvalNeeded && !missing.size && (transport !== 'stdio' || !!executable) && !config.http_headers_helper,
       };
       servers.push(data);
       const childEnv = { ...getDefaultEnvironment(), ...object(expanded.env) };

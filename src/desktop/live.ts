@@ -26,6 +26,7 @@ export class LiveVoice {
   private tasks = new Set<number>()
   subscribe = (callback: () => void) => { this.listeners.add(callback); return () => { this.listeners.delete(callback) } }
   snapshot = () => this.state
+  dismissError() { this.update({ error: '', ...(this.state.status === 'error' ? { status: 'off' as const } : {}) }) }
   private update(patch: Partial<LiveState>) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()) }
   private event(value: unknown) { if (this.ready && this.channel?.readyState === 'open') this.channel.send(JSON.stringify(value)) }
   context() {

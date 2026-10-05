@@ -58,6 +58,7 @@ test('invalid configuration errors never quote their secret-bearing source', asy
 
 test('HTTP check initializes and lists tools without invoking a tool; auth failures are private', async () => {
   const { repo, json, inventory } = await fixture();
+  await json(path.join(repo, '.claude/settings.local.json'), { enabledMcpjsonServers: ['fixture'] });
   const calls = []; let deny = false;
   const server = http.createServer(async (req, res) => {
     if (deny) { res.writeHead(401, { 'Content-Type':'application/json' }); res.end('{"error":"echo-private-header"}'); return; }
@@ -81,6 +82,7 @@ test('HTTP check initializes and lists tools without invoking a tool; auth failu
 
 test('stdio checks reap their private server process and never run a server tool', async () => {
   const { repo, json, inventory } = await fixture();
+  await json(path.join(repo, '.claude/settings.local.json'), { enabledMcpjsonServers: ['fixture'] });
   const script = path.join(repo,'fixture.mjs'), pidFile=path.join(repo,'pid.txt'), callsFile=path.join(repo,'calls.txt');
   await writeFile(script, `import{createInterface}from'node:readline';import{writeFileSync,appendFileSync}from'node:fs';writeFileSync(${JSON.stringify(pidFile)},String(process.pid));createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);appendFileSync(${JSON.stringify(callsFile)},m.method+'\\n');if(m.id!=null)console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result:m.method==='initialize'?{protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'fixture',version:'1'}}:{tools:[]}}))});`);
   await json(path.join(repo,'.mcp.json'), {mcpServers:{fixture:{command:process.execPath,args:[script]}}});
@@ -92,6 +94,7 @@ test('stdio checks reap their private server process and never run a server tool
 test('checks are invalidated when credentials change and disabled servers cannot launch', async () => {
   let probes=0;
   const { repo, json, inventory } = await fixture({probe:async()=>{probes++;return{status:'available',toolCount:0}}});
+  await json(path.join(repo, '.claude/settings.local.json'), { enabledMcpjsonServers: ['fixture'] });
   await json(path.join(repo,'.mcp.json'), {mcpServers:{fixture:{url:'https://example.test',headers:{Authorization:'${MRMAK_MCP_TEST_KEY:-}'}}}});
   await writeFile(path.join(repo,'.env'),'MRMAK_MCP_TEST_KEY=first-private-key\n');
   await inventory.check('claude:fixture'); assert.equal((await inventory.list()).servers[0].connection.status,'available');
@@ -99,6 +102,23 @@ test('checks are invalidated when credentials change and disabled servers cannot
   assert.equal((await inventory.list()).servers[0].connection,null);
   await json(path.join(repo,'.mcp.json'), {mcpServers:{fixture:{url:'https://example.test',disabled:true}}});
   await assert.rejects(inventory.check('claude:fixture')); assert.equal(probes,1);
+});
+
+test('project MCP checks require approval, and withdrawing approval invalidates a previous check', async () => {
+  let probes = 0;
+  const { repo, json, inventory } = await fixture({ probe: async () => { probes++; return { status: 'available', toolCount: 0 }; } });
+  await json(path.join(repo, '.mcp.json'), { mcpServers: { fixture: { command: process.execPath } } });
+  try {
+    assert.equal((await inventory.list()).servers[0].canCheck, false);
+    await assert.rejects(inventory.check('claude:fixture')); assert.equal(probes, 0);
+    await json(path.join(repo, '.claude/settings.local.json'), { enabledMcpjsonServers: ['fixture'] });
+    await inventory.check('claude:fixture'); assert.equal(probes, 1);
+    assert.equal((await inventory.list()).servers[0].connection.status, 'available');
+    await json(path.join(repo, '.claude/settings.local.json'), {});
+    const item = (await inventory.list()).servers[0];
+    assert.equal(item.canCheck, false); assert.equal(item.connection, null);
+    await assert.rejects(inventory.check('claude:fixture')); assert.equal(probes, 1);
+  } finally { inventory.close(); }
 });
 
 test('agent environment forwards only explicitly scoped MCP values from the project env', async () => {

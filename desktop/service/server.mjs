@@ -84,7 +84,12 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
         case 'reopen_chat': { const session = await sessions.resume(args.id); focus(session.id); return session; }
         case 'close_chat': return closeChat(args.id);
         case 'pin_chat': return sessions.pin(args.id, args.pinned);
-        case 'open_chat': { const session = await sessions.create({ ...args, name: taskTitle(args.name), effort: taskEffort(latestRequest, args.effort), bypass: args.bypass ?? settings.defaultBypass }); focus(session.id); return session; }
+        case 'open_chat': {
+          if (args.bypass != null && typeof args.bypass !== 'boolean') throw new Error('Choose a valid chat permission setting.');
+          if (args.bypass === true && settings.defaultBypass !== true) throw new Error('To enable bypass, choose it yourself in New chat or Settings. Mr. Mak cannot raise the selected permission level.');
+          const session = await sessions.create({ ...args, name: taskTitle(args.name), effort: taskEffort(latestRequest, args.effort), bypass: args.bypass === false ? false : settings.defaultBypass === true });
+          focus(session.id); return session;
+        }
         case 'read_chat': return sessions.read(args.id);
         case 'send_to_chat': return sessions.input(args.id, args.text, { coordinator: true, submit: true });
         case 'attach_files': return attach(args.id, args.paths, true);
@@ -121,7 +126,9 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
   const quick = await new QuickActions({ stateDir, workspace, context: () => ({ chats: sessions.active(), route: workspaceRoute }), execute: (...args) => coordinator.execute(...args), completed: operation => broadcast('coordinator-result', { operation }) }).init();
   const askMak = async data => {
     if (coordinator.operationPromises.has(data.id) || coordinator.operations.has(data.id)) return coordinator.ask(data);
-    return await quick.ask(data) || coordinator.ask(data);
+    const images = await attachments.coordinatorImages(data.images);
+    if (images.length) return coordinator.ask({ ...data, images });
+    return await quick.ask(data) || coordinator.ask({ ...data, images });
   };
   coordinator.on('state', state => broadcast('coordinator-state', { state }));
   coordinator.on('result', operation => broadcast('coordinator-result', { operation }));
