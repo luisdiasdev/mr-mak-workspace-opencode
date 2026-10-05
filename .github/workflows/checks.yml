@@ -20,6 +20,7 @@ jobs:
       - run: npm run build
       - run: npm run test:preview
       - run: node desktop/service/test/theme-ui.mjs
+      - run: node desktop/service/test/voice-ui.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

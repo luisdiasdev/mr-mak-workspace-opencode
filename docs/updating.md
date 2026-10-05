@@ -7,7 +7,7 @@ context, credentials or agent conversations.
 ## Application
 
 1. Finish active agent tasks, then choose Quit from Mr. Mak's tray menu.
-2. Install **Mr. Mak Workspace 0.4.18** for Windows x64.
+2. Install **Mr. Mak Workspace 0.4.19** for Windows x64.
 3. Open the same repository you were using before. Your cards, settings and
    History remain in that folder.
 

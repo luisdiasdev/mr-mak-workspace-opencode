@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.19 - 2026-10-05
+
+- Talk to Mak now accepts pasted screenshots and attached images. Preview or
+  remove them before sending; failed requests keep the draft and attachments.
+  Codex receives the images as image inputs, and copies stay in your inbox.
+- Shift+Enter adds a new line in Talk to Mak. Enter sends the message, and
+  text composition with an input method does not submit it accidentally.
+- Microphone and message errors can be dismissed. Closing an error does not
+  request microphone access again.
+- Coordinator-created chats respect the permission level selected in the UI.
+  Project MCP connection checks also respect the agent's saved approval state.
+- Added optional offline asset delivery manifests from
+  [zedarvates](https://github.com/zedarvates) in
+  [PR #11](https://github.com/witnesstodark/mr-mak-workspace/pull/11).
+  Build a file manifest or verify a delivery's sizes and hashes without an
+  account or network request. See the [manifest guide](scripts/asset-delivery/README.md).
+
+**Update:** finish active tasks, quit Mr. Mak, then install the new package.
+For a source build, follow the [update guide](docs/updating.md). The optional
+manifest tool comes from the repository update. This release addresses #13,
+#14 and #15; the taskbar-icon report (#16) and the wider security review (#5)
+remain open.
+
 ## 0.4.18 - 2026-10-04
 
 - Added Linux desktop packaging and release build automation, contributed by
